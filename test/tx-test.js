@@ -346,6 +346,39 @@ describe('TX', function() {
     }
   }
 
+  it('should throw an error from signatureHash() when version is not 0 or 1', () => {
+    let json = sighashTests[1];
+    const test = parseSighashTest(json);
+    const {tx, script, index, type} = test;
+    const subscript = script.getSubscript(0).removeSeparators();
+
+    assert.throws(() => {
+      tx.signatureHash(index, subscript, 0, type, 3);
+    });
+  });
+
+  it('should not throw an error from signatureHash() when version is 0', () => {
+    let json = sighashTests[1];
+    const test = parseSighashTest(json);
+    const {tx, script, index, type} = test;
+    const subscript = script.getSubscript(0).removeSeparators();
+
+    assert.doesNotThrow(() => {
+      tx.signatureHash(index, subscript, 0, type, 0);
+    });
+  });
+
+  it('should not throw an error from signatureHash() when version is 1', () => {
+    let json = sighashTests[1];
+    const test = parseSighashTest(json);
+    const {tx, script, index, type} = test;
+    const subscript = script.getSubscript(0).removeSeparators();
+
+    assert.doesNotThrow(() => {
+      tx.signatureHash(index, subscript, 0, type, 1);
+    });
+  });
+
   it('should fail on >51 bit coin values', () => {
     const [input, view] = createInput(consensus.MAX_MONEY + 1);
     const tx = new TX({
