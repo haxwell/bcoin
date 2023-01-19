@@ -28,6 +28,9 @@ const nodejsUtil = require('util');
 const validTests = require('./data/core-data/tx-valid.json');
 const invalidTests = require('./data/core-data/tx-invalid.json');
 const sighashTests = require('./data/core-data/sighash-tests.json');
+const {Coin} = require("../lib/primitives");
+const sinon = require("sinon");
+const {secp256k1} = require("bcrypto");
 
 const tx1 = common.readTX('tx1');
 const tx2 = common.readTX('tx2');
@@ -1168,5 +1171,62 @@ describe('TX', function() {
     const tx = new TX(options);
 
     assert.strictEqual(tx.outputs.length, 0);
+  });
+
+  it('should return false from checksig() if sig length is 0', () => {
+    const index = 0;
+    const [tx, view] = tx2.getTX();
+    const coin = view.getCoinFor(tx.inputs[0]);
+    const sig = Buffer.alloc(0);
+    const key = Buffer.alloc(0);
+    const version = 0;
+    const result = tx.checksig(index, coin.script, coin.value, sig, key, version);
+
+    assert.strictEqual(result, false);
+  });
+
+  it('verify call to secp256k1.verifyDER() during tx.checksig()', () => {
+    const index = 0;
+    const [tx, view] = tx2.getTX();
+    const coin = view.getCoinFor(tx.inputs[0]);
+    const prev = coin.script;
+    const value = coin.value;
+    const sig = Buffer.from('304402200e01', 'hex');
+    const key = Buffer.from('02b2b2b2b2', 'hex');
+    const version = 0;
+
+    const fakeHash = Buffer.alloc(32, 0x01);
+    // create function to return fake hash
+    const fakeSignatureHashFunc = (_index, _prev, _value, _type, _version) => {
+      assert(_index === index);
+      assert(_prev.equals(prev));
+      assert(_value === value);
+      assert(_type === 0x01);
+      assert(_version === version);
+
+      return fakeHash;
+    };
+
+    // replace signatureHash with our fake function
+    const oldSigHash = TX.prototype.signatureHash;
+    TX.prototype.signatureHash = fakeSignatureHashFunc;
+
+    // create stub for secp256k1.verifyDER function
+    const verifyDERStub = sinon.stub(secp256k1, 'verifyDER').returns(true)
+
+    // call tx.checksig() with our fake signature hash
+    const result = tx.checksig(index, prev, value, sig, key, version);
+
+    assert.strictEqual(result, true);
+
+    // verify that secp256k1.verifyDER was called with our fake hash
+    assert.strictEqual(verifyDERStub.calledOnce, true);
+    assert.strictEqual(verifyDERStub.calledWith(fakeHash, sig.slice(0, -1), key), true);
+
+    // restore original signatureHash function
+    TX.prototype.signatureHash = oldSigHash;
+
+    // restore original secp256k1.verifyDER function
+    verifyDERStub.restore();
   });
 });
