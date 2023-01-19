@@ -1155,4 +1155,18 @@ describe('TX', function() {
     assert(fmt.includes('version'));
     assert(fmt.includes('locktime'));
   });
+
+  it('should not update inputs in fromOptions() when options.inputs is null', () => {
+    const options = {  };
+    const tx = new TX(options);
+
+    assert.strictEqual(tx.inputs.length, 0);
+  });
+
+  it('should not update outputs in fromOptions() when options.outputs is null', () => {
+    const options = {  };
+    const tx = new TX(options);
+
+    assert.strictEqual(tx.outputs.length, 0);
+  });
 });
